@@ -14,6 +14,8 @@ const CreateShipment: React.FC = () => {
   const [goodsPrice, setGoodsPrice] = useState('');
   const [totalPrice, setTotalPrice] = useState(0);
   const [result, setResult] = useState<any>(null);
+  const [showLabelPreview, setShowLabelPreview] = useState(false);
+  const [labelUrl, setLabelUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [form, setForm] = useState<any>({});
@@ -116,24 +118,35 @@ const CreateShipment: React.FC = () => {
         body: JSON.stringify(payload),
         headers: { 'Content-Type': 'application/json' },
       });
-      setResult(res.shipment || res);
+      const shipment = res.shipment || res;
+      setResult(shipment);
+      if (shipment && shipment.id) {
+        setLabelUrl(`http://localhost:8000/api/shipments/${shipment.id}/label?format=pdf`);
+        setShowLabelPreview(true);
+      }
     } catch (e: any) {
       setError(e.message || 'Erreur lors de la création');
     }
   };
 
-  if (result) {
-    return (
-      <div className="max-w-xl mx-auto p-6">
-        <h2 className="text-2xl font-semibold mb-6">Expédition créée !</h2>
-        <div className="card p-6 space-y-2">
-          <div><strong>Label:</strong> {result.label}</div>
-          <div><strong>Tracking Number:</strong> {result.tracking_number || 'Généré côté backend'}</div>
-          <div><strong>Status:</strong> {result.status || 'created'}</div>
-        </div>
+
+  // Label preview modal
+  const labelPreviewModal = showLabelPreview && labelUrl && (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full shadow-lg relative">
+        <button
+          className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
+          onClick={() => setShowLabelPreview(false)}
+        >✕</button>
+        <h3 className="text-lg font-semibold mb-4">Aperçu de l'étiquette</h3>
+        <iframe
+          src={labelUrl}
+          title="Aperçu de l'étiquette"
+          className="w-full h-[600px] border rounded"
+        />
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <div className="max-w-xl mx-auto p-6">
@@ -249,6 +262,7 @@ const CreateShipment: React.FC = () => {
         </div>
         <button type="submit" className="btn-primary mt-4">Créer l'expédition</button>
       </form>
+      {labelPreviewModal}
     </div>
   );
 };

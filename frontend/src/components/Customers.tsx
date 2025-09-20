@@ -16,23 +16,8 @@ interface Customer {
 }
 
 const Customers: React.FC = () => {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState<Partial<Customer>>({});
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
 
-  // Location dropdowns
-  const [governorates, setGovernorates] = useState<string[]>([]);
-  const [delegations, setDelegations] = useState<string[]>([]);
-  const [localities, setLocalities] = useState<{ localite: string; cp: string }[]>([]);
-
-  useEffect(() => {
-    loadCustomers();
-    loadGovernorates();
-  }, []);
-
+  // Load customers from API
   const loadCustomers = async () => {
     setLoading(true);
     try {
@@ -44,6 +29,26 @@ const Customers: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // State declarations
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState<Partial<Customer>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [governorates, setGovernorates] = useState<string[]>([]);
+  const [delegations, setDelegations] = useState<string[]>([]);
+  const [localities, setLocalities] = useState<{ localite: string; cp: string }[]>([]);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Initial data load
+  useEffect(() => {
+    loadCustomers();
+    loadGovernorates();
+  }, []);
+
 
   const loadGovernorates = async () => {
     try {
@@ -132,27 +137,41 @@ const Customers: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Supprimer ce client ?')) return;
+    setDeleteId(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
     try {
-      await apiFetch(`/api/customers/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/customers/${deleteId}`, { method: 'DELETE' });
+      setShowDeleteModal(false);
+      setDeleteId(null);
       loadCustomers();
     } catch {
       setError('Erreur lors de la suppression');
+      setShowDeleteModal(false);
+      setDeleteId(null);
     }
   };
 
   // Intelligent global score: find best match by phone or normalized name
-  function getIntelligentScore(current: Partial<Customer>) {
-    const normalizedName = current.name?.trim().toLowerCase();
-    const byPhone = customers.find(c => c.phone === current.phone);
-    if (byPhone) return byPhone.score;
-    const byName = customers.find(c => c.name.trim().toLowerCase() === normalizedName);
-    if (byName) return byName.score;
-    return current.score;
-  }
+  // Removed unused getIntelligentScore function
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded shadow">
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full">
+            <h3 className="text-lg font-bold mb-2">Confirmer la suppression</h3>
+            <p className="mb-4">Voulez-vous vraiment supprimer ce client ? Cette action est irréversible.</p>
+            <div className="flex gap-2 justify-end">
+              <button className="btn-secondary" onClick={() => { setShowDeleteModal(false); setDeleteId(null); }}>Annuler</button>
+              <button className="btn-danger" onClick={confirmDelete}>Supprimer</button>
+            </div>
+          </div>
+        </div>
+      )}
       <h2 className="text-xl font-bold mb-4">Clients</h2>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <input name="name" value={form.name || ''} onChange={handleChange} placeholder="Nom" className="border px-3 py-2 rounded" required />
@@ -181,8 +200,11 @@ const Customers: React.FC = () => {
         ) : customers.length === 0 ? (
           <div className="text-gray-500">Aucun client enregistré.</div>
         ) : (
-          customers.map(cust => {
-            const scoreDisplay = getIntelligentScore(cust);
+          customers.map((cust: Customer) => {
+            // Intelligent score lookup
+            const normalizedName = cust.name.trim().toLowerCase();
+            const bestMatch = customers.find((c: Customer) => c.phone === cust.phone) || customers.find((c: Customer) => c.name.trim().toLowerCase() === normalizedName);
+            const scoreDisplay = bestMatch?.score ?? 100;
             let scoreColor = 'text-blue-600';
             let scoreText = 'Neutre';
             const scoreNum = Number(scoreDisplay);
@@ -194,7 +216,7 @@ const Customers: React.FC = () => {
             }
             return (
               <div key={cust.id} className="p-4 border rounded flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                <div>
+                <div className="flex-1">
                   <div className="font-semibold">{cust.name}</div>
                   <div>{cust.address}, {cust.localite} {cust.postal_code}</div>
                   <div className="text-sm text-gray-600">{cust.phone} {cust.email && <>| {cust.email}</>} | <span className={`font-bold ${scoreColor}`}>Score: {scoreText}</span></div>
@@ -210,6 +232,6 @@ const Customers: React.FC = () => {
       </div>
     </div>
   );
-};
 
+}
 export default Customers;

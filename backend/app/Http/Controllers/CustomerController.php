@@ -12,8 +12,8 @@ class CustomerController extends Controller
         $name = $request->query('name');
         $phone = $request->query('phone');
         $normalizedName = trim(strtolower($name));
-        $history = \App\Models\CustomerHistory::where('phone', $phone)
-            ->orWhereRaw('LOWER(TRIM(name)) = ?', [$normalizedName])
+        $history = \App\Models\CustomerHistory::whereRaw('LOWER(TRIM(name)) = ?', [$normalizedName])
+            ->where('phone', $phone)
             ->first();
         if ($history) {
             return response()->json([
@@ -29,11 +29,6 @@ class CustomerController extends Controller
     {
         $merchantId = Auth::id();
         $customers = Customer::where('merchant_id', $merchantId)->get();
-        // Attach global score from CustomerHistory for each customer
-        foreach ($customers as $customer) {
-            $history = \App\Models\CustomerHistory::where('phone', $customer->phone)->first();
-            $customer->score = $history ? $history->score : 100;
-        }
         return $customers;
     }
 
@@ -51,20 +46,8 @@ class CustomerController extends Controller
             'postal_code' => 'required|string',
         ]);
         $data['merchant_id'] = $merchantId;
-        // Fetch global score by phone or normalized name
-        $normalizedName = trim(strtolower($data['name']));
-        $history = \App\Models\CustomerHistory::where('phone', $data['phone'])
-            ->orWhereRaw('LOWER(TRIM(name)) = ?', [$normalizedName])
-            ->orderByDesc('score')->first();
-        $data['score'] = $history ? $history->score : 100;
         $customer = Customer::create($data);
-        // Update global score after creation
         Customer::updateGlobalScore($customer->name, $customer->phone);
-        // Always return the global score for this customer
-        $history = \App\Models\CustomerHistory::where('phone', $customer->phone)
-            ->orWhereRaw('LOWER(TRIM(name)) = ?', [$normalizedName])
-            ->orderByDesc('score')->first();
-        $customer->score = $history ? $history->score : 100;
         return $customer;
     }
 
@@ -86,9 +69,6 @@ class CustomerController extends Controller
         ]);
         $customer->update($data);
         Customer::updateGlobalScore($customer->name, $customer->phone);
-        // Always return the global score for this customer
-        $history = \App\Models\CustomerHistory::where('phone', $customer->phone)->first();
-        $customer->score = $history ? $history->score : 100;
         return $customer;
     }
 
@@ -106,15 +86,15 @@ class CustomerController extends Controller
     {
         $name = $request->query('name');
         $phone = $request->query('phone');
+        // No score in CustomerHistory, just return basic info
         $history = \App\Models\CustomerHistory::where('phone', $phone)->first();
         if ($history) {
             return response()->json([
-                'score' => $history->score,
                 'name' => $history->name,
                 'phone' => $history->phone,
                 'id' => $history->id,
             ]);
         }
-        return response()->json(['score' => 100, 'name' => $name, 'phone' => $phone, 'id' => null]);
+        return response()->json(['name' => $name, 'phone' => $phone, 'id' => null]);
     }
 }
