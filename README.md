@@ -48,7 +48,7 @@ Sendify is a shipment and customer management platform for merchants and admins.
 
 - Backend code: `sendify/backend`
 - Frontend code: `sendify/frontend`
-- Plugins: `aramex/`, `marketplace/`, etc.
+- Plugins: `aramex/`, etc.
 
 ## License
 

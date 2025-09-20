@@ -27,25 +27,47 @@ class CustomerController extends Controller
     }
     public function index()
     {
-        $merchantId = Auth::id();
-        $customers = Customer::where('merchant_id', $merchantId)->get();
-        return $customers;
+        $user = Auth::user();
+        if ($user && method_exists($user, 'isAdmin') && $user->isAdmin()) {
+            // Admin: see all customers
+            return Customer::all();
+        } else {
+            // Merchant: see only their own
+            $merchantId = $user ? $user->id : null;
+            return Customer::where('merchant_id', $merchantId)->get();
+        }
     }
 
     public function store(Request $request)
     {
-        $merchantId = Auth::id();
-        $data = $request->validate([
-            'name' => 'required|string',
-            'phone' => 'required|string',
-            'email' => 'nullable|email',
-            'address' => 'required|string',
-            'governorate' => 'required|string',
-            'delegation' => 'required|string',
-            'localite' => 'required|string',
-            'postal_code' => 'required|string',
-        ]);
-        $data['merchant_id'] = $merchantId;
+        $user = Auth::user();
+        if ($user && method_exists($user, 'isAdmin') && $user->isAdmin()) {
+            // Admin must specify merchant_id
+            $data = $request->validate([
+                'name' => 'required|string',
+                'phone' => 'required|string',
+                'email' => 'nullable|email',
+                'address' => 'required|string',
+                'governorate' => 'required|string',
+                'delegation' => 'required|string',
+                'localite' => 'required|string',
+                'postal_code' => 'required|string',
+                'merchant_id' => 'required|integer|exists:users,id',
+            ]);
+        } else {
+            $merchantId = $user ? $user->id : null;
+            $data = $request->validate([
+                'name' => 'required|string',
+                'phone' => 'required|string',
+                'email' => 'nullable|email',
+                'address' => 'required|string',
+                'governorate' => 'required|string',
+                'delegation' => 'required|string',
+                'localite' => 'required|string',
+                'postal_code' => 'required|string',
+            ]);
+            $data['merchant_id'] = $merchantId;
+        }
         $customer = Customer::create($data);
         Customer::updateGlobalScore($customer->name, $customer->phone);
         return $customer;
@@ -53,8 +75,8 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer)
     {
-        $merchantId = Auth::id();
-        if ($customer->merchant_id !== $merchantId) {
+        $user = Auth::user();
+        if (!($user && method_exists($user, 'isAdmin') && $user->isAdmin()) && $customer->merchant_id !== $user->id) {
             abort(403);
         }
         $data = $request->validate([
@@ -74,8 +96,8 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer)
     {
-        $merchantId = Auth::id();
-        if ($customer->merchant_id !== $merchantId) {
+        $user = Auth::user();
+        if (!($user && method_exists($user, 'isAdmin') && $user->isAdmin()) && $customer->merchant_id !== $user->id) {
             abort(403);
         }
         $customer->delete();

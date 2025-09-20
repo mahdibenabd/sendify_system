@@ -38,12 +38,30 @@ class ShipmentController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $shipments = \App\Models\Shipment::where('merchant_id', $user->id)->orderByDesc('id')->get();
+        if ($user && method_exists($user, 'isAdmin') && $user->isAdmin()) {
+            // Admin: see all shipments
+            $shipments = \App\Models\Shipment::orderByDesc('id')->get();
+        } else {
+            // Merchant: see only their own
+            $shipments = \App\Models\Shipment::where('merchant_id', $user->id)->orderByDesc('id')->get();
+        }
         return response()->json(['data' => $shipments]);
     }
 
     public function store(Request $request)
     {
+        $user = $request->user();
+        if (!($user && method_exists($user, 'isAdmin') && $user->isAdmin())) {
+            // Merchants can only create shipments for themselves
+            $merchantId = $user->id;
+        } else {
+            // Admins must specify merchant_id
+            $merchantId = $request->input('merchant_id');
+            if (!$merchantId) {
+                return response()->json(['error' => 'merchant_id is required for admin'], 422);
+            }
+        }
+
         $data = $request->validate([
             'pickup_address_id' => 'required|exists:pickup_addresses,id',
             'customer_id' => 'nullable|exists:customers,id',
@@ -58,15 +76,16 @@ class ShipmentController extends Controller
             $customer = \App\Models\Customer::create([
                 'name' => $data['new_customer_name'],
                 'phone' => $data['new_customer_phone'],
+                'merchant_id' => $merchantId,
             ]);
             $data['customer_id'] = $customer->id;
         }
 
-    // Get commission rate, shipping fee, and barcode prefix from settings
-    $commission = (float) (\App\Models\Setting::where('key', 'commission_rate')->value('value') ?? 2.000);
-    $shipmentPrice = (float) (\App\Models\Setting::where('key', 'shipping_fee')->value('value') ?? 10.000);
-    $barcodePrefix = \App\Models\Setting::where('key', 'barcode_prefix')->value('value') ?? 'CustomLabel';
-    $totalPrice = $data['goods_price'] + $shipmentPrice + $commission;
+        // Get commission rate, shipping fee, and barcode prefix from settings
+        $commission = (float) (\App\Models\Setting::where('key', 'commission_rate')->value('value') ?? 2.000);
+        $shipmentPrice = (float) (\App\Models\Setting::where('key', 'shipping_fee')->value('value') ?? 10.000);
+        $barcodePrefix = \App\Models\Setting::where('key', 'barcode_prefix')->value('value') ?? 'CustomLabel';
+        $totalPrice = $data['goods_price'] + $shipmentPrice + $commission;
 
         // Get customer info
         $customer = \App\Models\Customer::find($data['customer_id']);
@@ -75,7 +94,7 @@ class ShipmentController extends Controller
         $carrier = in_array($governorate, $tunisiaExpressGovernorates) ? 'tunisia express' : 'aramex';
 
         $shipment = Shipment::create([
-            'merchant_id' => $request->user()->id,
+            'merchant_id' => $merchantId,
             'pickup_address_id' => $data['pickup_address_id'],
             'customer_id' => $data['customer_id'],
             'designation' => $data['designation'] ?? null,
@@ -165,7 +184,6 @@ class ShipmentController extends Controller
         return response()->json(['shipment' => $shipment]);
     }
 }
-
 
 
 

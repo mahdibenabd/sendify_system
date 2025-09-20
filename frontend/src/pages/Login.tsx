@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { apiFetch } from '../lib/api'
 import { useNavigate } from 'react-router-dom'
@@ -6,11 +6,15 @@ import { useNavigate } from 'react-router-dom'
 const Login = () => {
   const [err, setErr] = useState<string | null>(null)
   const navigate = useNavigate()
+
   const { user } = useAuth()
-  if (user) {
-    navigate('/dashboard')
-    return null
-  }
+  // Redirect to dashboard if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, navigate])
+  if (user) return null
   
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -53,5 +57,4 @@ const Login = () => {
 }
 
 export default Login
-
 

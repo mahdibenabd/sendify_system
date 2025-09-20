@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import RequireAuth from '../components/RequireAuth'
 import { FaUsers, FaBox, FaChartLine, FaEdit, FaTrash, FaPlus, FaEye } from 'react-icons/fa'
 import { apiFetch } from '../lib/api'
 
@@ -142,7 +143,8 @@ const Admin = () => {
   if (loading) return <div className="container py-8">Chargement...</div>
 
   return (
-    <div className="container py-8">
+    <RequireAuth role="admin">
+      <div className="container py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Administration</h1>
         <div className="flex gap-2">
@@ -415,8 +417,9 @@ const Admin = () => {
           }}
         />
       )}
-    </div>
-  )
+      </div>
+    </RequireAuth>
+  );
 }
 
 const UserForm = ({ user, onSave, onCancel }: {

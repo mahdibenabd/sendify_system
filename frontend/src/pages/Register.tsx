@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { apiFetch } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -6,11 +6,15 @@ import { useNavigate } from 'react-router-dom'
 const Register = () => {
   const [err, setErr] = useState<string | null>(null)
   const navigate = useNavigate()
+
   const { user } = useAuth()
-  if (user) {
-    navigate('/dashboard')
-    return null
-  }
+  // Redirect to dashboard if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, navigate])
+  if (user) return null
   
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -27,8 +31,8 @@ const Register = () => {
           password: form.get('password')
         })
       })
-      localStorage.setItem('token', data.token)
-      location.reload() // Reload to update auth context
+  localStorage.setItem('token', data.token)
+  navigate('/dashboard', { replace: true })
     } catch (e: any) {
       setErr(e.message || 'Erreur')
     }
@@ -69,5 +73,4 @@ const Register = () => {
 }
 
 export default Register
-
 
